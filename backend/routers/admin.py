@@ -26,6 +26,9 @@ def kullanici_ekle(
         if tc_existing:
             raise HTTPException(status_code=400, detail="Bu TC Kimlik numarası zaten kayıtlı")
 
+    if data.role == models.UserRole.BOLGE_MUDUR and not data.bolge:
+        raise HTTPException(status_code=400, detail="Bölge müdürü için bölge seçilmesi zorunludur")
+
     user = models.User(
         ad=data.ad,
         soyad=data.soyad,
@@ -35,6 +38,7 @@ def kullanici_ekle(
         adres=data.adres,
         hashed_password=get_password_hash(data.password),
         role=data.role,
+        bolge=data.bolge if data.role == models.UserRole.BOLGE_MUDUR else None,
     )
     db.add(user)
     db.commit()
@@ -46,7 +50,9 @@ def kullanicilari_listele(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(admin_only)
 ):
-    return db.query(models.User).filter(models.User.role != models.UserRole.ADMIN).all()
+    return db.query(models.User).filter(
+        models.User.role != models.UserRole.ADMIN
+    ).all()
 
 @router.get("/kullanicilar/{user_id}", response_model=UserOut)
 def kullanici_detay(
@@ -244,7 +250,7 @@ def harita_dagitim_log(
             "plaka": t.plaka,
             "sofor_ad": t.sofor_ad,
             "sofor_telefon": t.sofor_telefon,
-            "durum": t.durum.value,
+            "durum": t.durum if isinstance(t.durum, str) else t.durum.value,
             "aciklama": t.aciklama,
             "gonderen_adi": f"{kayit_yapan.ad} {kayit_yapan.soyad}" if kayit_yapan else None,
             "kaynak_merkez": {

@@ -202,6 +202,20 @@ def tir_ulasti(
     from datetime import datetime
     tir.durum = models.TirDurum.ULASTU
     tir.ulaşma_zamani = datetime.utcnow()
+
+    # Araç ve şoförü tekrar MÜSAİT yap
+    arac = db.query(models.Arac).filter(models.Arac.plaka == tir.plaka).first()
+    if arac:
+        arac.durum = models.AracDurum.MUSAIT
+    if tir.sofor_ad:
+        parcalar = tir.sofor_ad.strip().split()
+        if len(parcalar) >= 2:
+            sofor = db.query(models.Sofor).filter(
+                models.Sofor.ad == parcalar[0],
+                models.Sofor.soyad == parcalar[-1]
+            ).first()
+            if sofor:
+                sofor.durum = models.SoforDurum.MUSAIT
     db.commit()
 
     # Dağıtım merkezindeki kullanıcıya bildirim gönder
@@ -343,6 +357,17 @@ def tir_olustur_ve_gonder(
     
     db.commit()
     db.refresh(tir)
+
+    # Araç ve şoförü YOLDA/GOREVDE yap
+    if hasattr(data, 'arac_id') and data.arac_id:
+        arac = db.query(models.Arac).filter(models.Arac.id == data.arac_id).first()
+        if arac:
+            arac.durum = models.AracDurum.YOLDA
+    if hasattr(data, 'sofor_id') and data.sofor_id:
+        sofor = db.query(models.Sofor).filter(models.Sofor.id == data.sofor_id).first()
+        if sofor:
+            sofor.durum = models.SoforDurum.GOREVDE
+    db.commit()
     
     # Dağıtım merkezi yetkili'ne bildirim
     if dagitim_merkez.yetkili_id:
@@ -408,5 +433,95 @@ def dagitim_merkezleri_listele(
         "il": m.il,
         "ilce": m.ilce,
         "tam_adres": m.tam_adres,
-        "tip": m.tip.value
+        "tip": m.tip if isinstance(m.tip, str) else m.tip.value
     } for m in merkezler]
+
+# ── Ürün Kataloğu ─────────────────────────────────────────────────────
+
+@router.get("/urun-katalogu")
+def urun_katalogu_ara(
+    q: str = "",
+    kategori: str = "",
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(toplama_auth)
+):
+    """Ürün kataloğunda arama yap"""
+    from sqlalchemy import text
+    
+    sorgu = db.execute(text("""
+        SELECT id, urun_adi, marka, gramaj, litre, birim, kategori
+        FROM urun_katalogu
+        WHERE aktif = 1
+        AND (urun_adi LIKE :q OR marka LIKE :q)
+        AND (:kategori = '' OR kategori = :kategori)
+        ORDER BY urun_adi ASC
+        LIMIT 30
+    """), {"q": f"%{q}%", "kategori": kategori})
+    
+    rows = sorgu.fetchall()
+    return [dict(r._mapping) for r in rows]
+
+@router.get("/urun-kategoriler")
+def urun_kategoriler(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(toplama_auth)
+):
+    from sqlalchemy import text
+    rows = db.execute(text("SELECT DISTINCT kategori FROM urun_katalogu WHERE aktif=1 ORDER BY kategori")).fetchall()
+    return [r[0] for r in rows]
+
+# ── Tır Manifesto ────────────────────────────────────────────────────
+
+@router.get("/tirlar/{tir_id}/manifesto")
+def tir_manifesto(
+    tir_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(toplama_auth)
+):
+    """Tır manifesto detaylarını döner"""
+    tir = db.query(models.Tir).filter(models.Tir.id == tir_id).first()
+    if not tir:
+        raise HTTPException(status_code=404, detail="Tır bulunamadı")
+
+    kaynak = db.query(models.Merkez).filter(models.Merkez.id == tir.kaynak_merkez_id).first()
+    hedef = db.query(models.Merkez).filter(models.Merkez.id == tir.hedef_merkez_id).first()
+    kayit_yapan = db.query(models.User).filter(models.User.id == tir.kayit_yapan_id).first() if tir.kayit_yapan_id else None
+
+    # Stok hareketleri
+    hareketler = db.query(models.StokHareketi).filter(
+        models.StokHareketi.tir_id == tir_id,
+        models.StokHareketi.hareket_tip == models.HareketTip.CIKIS
+    ).all()
+
+    stok_listesi = []
+    for h in hareketler:
+        stok = db.query(models.Stok).filter(models.Stok.id == h.stok_id).first()
+        if stok:
+            stok_listesi.append({
+                "urun_adi": stok.urun_adi,
+                "marka": stok.marka,
+                "miktar": h.miktar,
+                "birim": stok.birim,
+                "gramaj": stok.gramaj,
+                "litre": stok.litre,
+                "kategori": stok.kategori,
+            })
+
+    return {
+        "tir_id": tir.id,
+        "plaka": tir.plaka,
+        "sofor_ad": tir.sofor_ad,
+        "sofor_telefon": tir.sofor_telefon,
+        "durum": tir.durum.value if hasattr(tir.durum, 'value') else tir.durum,
+        "aciklama": tir.aciklama,
+        "kayit_yapan": f"{kayit_yapan.ad} {kayit_yapan.soyad}" if kayit_yapan else None,
+        "kaynak_merkez": {
+            "ad": kaynak.ad, "il": kaynak.il, "ilce": kaynak.ilce, "tam_adres": kaynak.tam_adres
+        } if kaynak else None,
+        "hedef_merkez": {
+            "ad": hedef.ad, "il": hedef.il, "ilce": hedef.ilce, "tam_adres": hedef.tam_adres
+        } if hedef else None,
+        "stoklar": stok_listesi,
+        "created_at": tir.created_at,
+        "ulasma_zamani": tir.ulaşma_zamani,
+    }

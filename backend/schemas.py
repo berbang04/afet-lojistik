@@ -27,6 +27,7 @@ class UserCreate(BaseModel):
     adres: Optional[str] = None
     password: str
     role: UserRole
+    bolge: Optional[str] = None
 
 class UserUpdate(BaseModel):
     ad: Optional[str] = None
@@ -46,6 +47,7 @@ class UserOut(BaseModel):
     tc_kimlik: Optional[str]
     adres: Optional[str]
     role: UserRole
+    bolge: Optional[str]
     aktif: bool
     created_at: datetime
 
@@ -64,6 +66,7 @@ class MerkezCreate(BaseModel):
     tam_adres: Optional[str] = None
     enlem: Optional[float] = None
     boylam: Optional[float] = None
+    bolge: Optional[str] = None
     yetkili_id: Optional[int] = None
 
 class MerkezOut(BaseModel):
@@ -78,6 +81,7 @@ class MerkezOut(BaseModel):
     tam_adres: Optional[str]
     enlem: Optional[float]
     boylam: Optional[float]
+    bolge: Optional[str]
     aktif: bool
     yetkili_id: Optional[int]
     created_at: datetime
@@ -185,6 +189,8 @@ class TirOlustur(BaseModel):
     hedef_merkez_id: int
     stoklar: List[TirStokYukleme]
     aciklama: Optional[str] = None
+    arac_id: Optional[int] = None
+    sofor_id: Optional[int] = None
 
 class TamamlananDagitimOut(BaseModel):
     id: int

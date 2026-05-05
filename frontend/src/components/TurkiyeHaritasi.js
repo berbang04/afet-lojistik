@@ -30,11 +30,23 @@ const IL_KOORDINATLAR = {
   "Kilis": [36.72, 37.12], "Osmaniye": [37.07, 36.25], "Düzce": [40.84, 31.16],
 };
 
-export default function TurkiyeHaritasi({ merkezler = [], dagitimLog = [], mod = 'merkezler' }) {
+// Bölge → iller eşleşmesi
+const BOLGE_ILLER = {
+  'Marmara': ['İstanbul','Bursa','Tekirdağ','Edirne','Kırklareli','Balıkesir','Çanakkale','Yalova','Kocaeli','Sakarya','Düzce','Bilecik','Bolu'],
+  'Ege': ['İzmir','Aydın','Denizli','Manisa','Muğla','Uşak','Afyonkarahisar','Kütahya'],
+  'Akdeniz': ['Antalya','Adana','Mersin','Hatay','Kahramanmaraş','Osmaniye','Burdur','Isparta'],
+  'İç Anadolu': ['Ankara','Konya','Kayseri','Sivas','Yozgat','Kırıkkale','Kırşehir','Nevşehir','Niğde','Aksaray','Karaman','Eskişehir','Çankırı'],
+  'Karadeniz': ['Samsun','Trabzon','Ordu','Giresun','Rize','Artvin','Zonguldak','Bartın','Kastamonu','Sinop','Çorum','Amasya','Tokat','Gümüşhane','Bayburt','Karabük','Bolu'],
+  'Doğu Anadolu': ['Malatya','Elazığ','Van','Erzurum','Erzincan','Tunceli','Bingöl','Bitlis','Muş','Hakkari','Iğdır','Kars','Ardahan','Ağrı'],
+  'Güneydoğu Anadolu': ['Gaziantep','Şanlıurfa','Diyarbakır','Mardin','Batman','Şırnak','Siirt','Kilis','Adıyaman'],
+};
+
+export default function TurkiyeHaritasi({ merkezler = [], dagitimLog = [], mod = 'merkezler', bolge = null, bolgeKoordinatlar = null, acilBolgeler = [] }) {
   const mapRef = useRef(null);
   const leafletMap = useRef(null);
   const markersRef = useRef([]);
   const linesRef = useRef([]);
+  const geojsonLayersRef = useRef([]);
 
   useEffect(() => {
     loadLeaflet(() => {
@@ -46,74 +58,123 @@ export default function TurkiyeHaritasi({ merkezler = [], dagitimLog = [], mod =
         leafletMap.current = null;
       }
     };
-    // eslint-disable-next-line
   }, []);
 
   useEffect(() => {
     if (!leafletMap.current || !window.L) return;
-    // Harita tamamen hazır olana kadar bekle
     setTimeout(() => renderMarkers(), 100);
-    // eslint-disable-next-line
-  }, [merkezler, dagitimLog, mod]);
+  }, [merkezler, dagitimLog, mod, bolge]);
 
   const loadLeaflet = (cb) => {
     if (window.L) { cb(); return; }
-
     if (!document.querySelector('link[href*="leaflet"]')) {
       const link = document.createElement('link');
       link.rel = 'stylesheet';
       link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
       document.head.appendChild(link);
     }
-
     if (!document.querySelector('script[src*="leaflet"]')) {
       const script = document.createElement('script');
       script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
       script.onload = cb;
       document.head.appendChild(script);
     } else {
-      const check = setInterval(() => {
-        if (window.L) { clearInterval(check); cb(); }
-      }, 100);
+      const check = setInterval(() => { if (window.L) { clearInterval(check); cb(); } }, 100);
     }
   };
 
   const initMap = () => {
     if (!mapRef.current || leafletMap.current || !window.L) return;
     const L = window.L;
-
-    // Icon fix — React build'de ikonlar kırılır
     delete L.Icon.Default.prototype._getIconUrl;
     L.Icon.Default.mergeOptions({
       iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
       iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
       shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
     });
-
     const map = L.map(mapRef.current, {
-      zoomControl: true,
-      scrollWheelZoom: true,
-      preferCanvas: true,  // performans için
+      zoomControl: true, scrollWheelZoom: true, preferCanvas: false,
     }).setView([39.1, 35.5], 6);
-
     L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-      attribution: '© OpenStreetMap © CARTO',
-      maxZoom: 18,
+      attribution: '© OpenStreetMap © CARTO', maxZoom: 18,
     }).addTo(map);
-
     leafletMap.current = map;
-
-    // Harita hazır olduktan sonra marker'ları çiz
-    map.whenReady(() => {
-      setTimeout(() => renderMarkers(), 200);
-    });
+    map.whenReady(() => setTimeout(() => renderMarkers(), 200));
   };
 
   const clearMap = () => {
     markersRef.current.forEach(m => { try { m.remove(); } catch(e) {} });
     linesRef.current.forEach(l => { try { l.remove(); } catch(e) {} });
+    geojsonLayersRef.current.forEach(l => { try { l.remove(); } catch(e) {} });
     markersRef.current = [];
     linesRef.current = [];
+    geojsonLayersRef.current = [];
+  };
+
+  // GeoJSON koordinatlarını Leaflet formatına çevir (lng,lat → lat,lng)
+  const convertCoords = (coords) => {
+    if (!coords || !coords.length) return [];
+    if (Array.isArray(coords[0][0])) {
+      return coords.map(ring => ring.map(c => [c[1], c[0]]));
+    }
+    return coords.map(c => [c[1], c[0]]);
+  };
+
+  const renderBolgeGeoJSON = (bolgeAdi) => {
+    const L = window.L;
+    if (!L || !window._trGeoJSON) return;
+
+    const bolgeIller = BOLGE_ILLER[bolgeAdi] || [];
+
+    window._trGeoJSON.features.forEach(feature => {
+      const ilAdi = feature.properties.name;
+      const ilBolgede = bolgeIller.includes(ilAdi);
+
+      const geom = feature.geometry;
+      let coords;
+
+      try {
+        if (geom.type === 'Polygon') {
+          coords = convertCoords(geom.coordinates[0]);
+          if (coords.length < 3) return;
+          const poly = L.polygon(coords, {
+            color: ilBolgede ? '#3b82f6' : '#374151',
+            fillColor: ilBolgede ? '#3b82f6' : '#111827',
+            fillOpacity: ilBolgede ? 0.25 : 0.4,
+            weight: ilBolgede ? 2 : 0.5,
+            opacity: ilBolgede ? 0.8 : 0.3,
+          }).addTo(leafletMap.current);
+          if (ilBolgede) {
+            poly.bindTooltip(ilAdi, { permanent: false, direction: 'center', className: 'leaflet-il-tooltip' });
+          }
+          geojsonLayersRef.current.push(poly);
+        } else if (geom.type === 'MultiPolygon') {
+          geom.coordinates.forEach(polygonCoords => {
+            if (!polygonCoords[0] || polygonCoords[0].length < 3) return;
+            const coords2 = convertCoords(polygonCoords[0]);
+            const poly = L.polygon(coords2, {
+              color: ilBolgede ? '#3b82f6' : '#374151',
+              fillColor: ilBolgede ? '#3b82f6' : '#111827',
+              fillOpacity: ilBolgede ? 0.25 : 0.4,
+              weight: ilBolgede ? 2 : 0.5,
+              opacity: ilBolgede ? 0.8 : 0.3,
+            }).addTo(leafletMap.current);
+            if (ilBolgede) {
+              poly.bindTooltip(ilAdi, { permanent: false, direction: 'center', className: 'leaflet-il-tooltip' });
+            }
+            geojsonLayersRef.current.push(poly);
+          });
+        }
+      } catch(e) {}
+    });
+  };
+
+  const loadGeoJSON = (cb) => {
+    if (window._trGeoJSON) { cb(); return; }
+    fetch('https://raw.githubusercontent.com/cihadturhan/tr-geojson/master/geo/tr-cities-utf8.json')
+      .then(r => r.json())
+      .then(data => { window._trGeoJSON = data; cb(); })
+      .catch(() => cb()); // GeoJSON yoksa normale devam et
   };
 
   const renderMarkers = () => {
@@ -121,9 +182,88 @@ export default function TurkiyeHaritasi({ merkezler = [], dagitimLog = [], mod =
     if (!L || !leafletMap.current) return;
     clearMap();
 
+    // Bölge poligonu varsa direkt çiz, yoksa GeoJSON ile il sınırlarını çiz
+    if (bolgeKoordinatlar && bolgeKoordinatlar.length >= 3) {
+      renderBolgePoligon(bolgeKoordinatlar);
+      renderAcilBolgeler();
+      renderMerkezler();
+    } else if (bolge) {
+      loadGeoJSON(() => {
+        renderBolgeGeoJSON(bolge);
+        renderAcilBolgeler();
+        renderMerkezler();
+      });
+    } else {
+      renderAcilBolgeler();
+      renderMerkezler();
+    }
+  };
+
+
+
+  const renderBolgePoligon = (koordinatlar) => {
+    const L = window.L;
+    if (!L || !leafletMap.current) return;
+    try {
+      const latlngs = koordinatlar.map(c => [c[0], c[1]]);
+      const poly = L.polygon(latlngs, {
+        color: '#3b82f6',
+        fillColor: '#3b82f6',
+        fillOpacity: 0.15,
+        weight: 2.5,
+        opacity: 0.9,
+      }).addTo(leafletMap.current);
+      geojsonLayersRef.current.push(poly);
+      // Haritayı bölgeye odakla
+      leafletMap.current.fitBounds(poly.getBounds(), { padding: [30, 30] });
+    } catch(e) {}
+  };
+
+  const renderAcilBolgeler = () => {
+    const L = window.L;
+    if (!L || !leafletMap.current || !acilBolgeler.length) return;
+
+    acilBolgeler.forEach(ab => {
+      if (!ab.koordinatlar || ab.koordinatlar.length < 3) return;
+      try {
+        const latlngs = ab.koordinatlar.map(c => [c[0], c[1]]);
+        const poly = L.polygon(latlngs, {
+          color: '#ef4444',
+          fillColor: '#ef4444',
+          fillOpacity: 0.15,
+          weight: 2,
+          opacity: 0.9,
+          dashArray: '6,4',
+        }).addTo(leafletMap.current);
+
+        const mudurBilgi = ab.mudur_adi ? "<div style='font-size:11px;color:#94a3b8;margin-top:4px;'>Operasyon Müdürü: " + ab.mudur_adi + "</div>" : '';
+        poly.bindPopup(
+          "<div style='font-family:sans-serif;min-width:200px;background:#111827;border-radius:8px;padding:12px;color:#e2e8f0;'>" +
+          "<div style='font-size:14px;font-weight:700;color:#ef4444;margin-bottom:4px;'>🚨 " + ab.ad + "</div>" +
+          (ab.aciklama ? "<div style='font-size:12px;color:#94a3b8;'>" + ab.aciklama + "</div>" : '') +
+          mudurBilgi +
+          "</div>"
+        );
+        geojsonLayersRef.current.push(poly);
+
+        // Bölge adı etiketi
+        const center = poly.getBounds().getCenter();
+        const label = L.divIcon({
+          html: "<div style='background:rgba(239,68,68,0.85);color:white;padding:3px 8px;border-radius:12px;font-size:11px;font-weight:700;white-space:nowrap;'>🚨 " + ab.ad + "</div>",
+          className: '', iconAnchor: [0, 0]
+        });
+        const labelMarker = L.marker(center, { icon: label }).addTo(leafletMap.current);
+        geojsonLayersRef.current.push(labelMarker);
+      } catch(e) {}
+    });
+  };
+
+  const renderMerkezler = () => {
+    const L = window.L;
+    if (!L || !leafletMap.current) return;
+
     if (mod === 'merkezler') {
       merkezler.forEach(m => {
-        // Önce veritabanındaki koordinatı kullan, yoksa il koordinatına düş
         let lat, lng;
         if (m.enlem && m.boylam) {
           lat = parseFloat(m.enlem);
@@ -139,8 +279,8 @@ export default function TurkiyeHaritasi({ merkezler = [], dagitimLog = [], mod =
         const ikon = m.tip === 'toplama' ? '📦' : '🏪';
 
         const marker = L.circleMarker([lat, lng], {
-          radius: 10, fillColor: renk, color: renk,
-          weight: 2, opacity: 1, fillOpacity: 0.85,
+          radius: 10, fillColor: renk, color: '#fff',
+          weight: 2, opacity: 1, fillOpacity: 0.9,
         }).addTo(leafletMap.current);
 
         marker.bindPopup(`
@@ -151,45 +291,86 @@ export default function TurkiyeHaritasi({ merkezler = [], dagitimLog = [], mod =
             </div>
             <div style="font-size:12px;color:#94a3b8;margin-bottom:2px;">📍 ${m.il} / ${m.ilce}</div>
             ${m.yetkili_adi ? `<div style="font-size:12px;color:#94a3b8;margin-bottom:2px;">👤 ${m.yetkili_adi}</div>` : ''}
-            <div style="font-size:12px;color:#94a3b8;">📦 ${m.stok_sayisi} stok kalemi</div>
+            <div style="font-size:12px;color:#94a3b8;">📦 ${m.stok_sayisi || 0} stok kalemi</div>
           </div>
         `);
         markersRef.current.push(marker);
       });
-
     } else {
+      // Tır rotaları
+      const rotaGruplari = {};
       dagitimLog.forEach(t => {
         if (!t.kaynak_merkez || !t.hedef_merkez) return;
-        const kaynakKoord = IL_KOORDINATLAR[t.kaynak_merkez.il];
-        const hedefKoord = IL_KOORDINATLAR[t.hedef_merkez.il];
+        const key = `${t.kaynak_merkez.il}→${t.hedef_merkez.il}`;
+        if (!rotaGruplari[key]) rotaGruplari[key] = [];
+        rotaGruplari[key].push(t);
+      });
+
+      Object.entries(rotaGruplari).forEach(([rota, tirListesi]) => {
+        const t0 = tirListesi[0];
+        const kaynakKoord = IL_KOORDINATLAR[t0.kaynak_merkez.il];
+        const hedefKoord = IL_KOORDINATLAR[t0.hedef_merkez.il];
         if (!kaynakKoord || !hedefKoord) return;
 
-        const renk = t.durum === 'tamamlandi' ? '#22c55e' : t.durum === 'ulastu' ? '#f59e0b' : '#3b82f6';
+        const enCritik = tirListesi.find(t => t.durum === 'yolda' || t.durum === 'YOLDA') ||
+                         tirListesi.find(t => t.durum === 'ulastu' || t.durum === 'ULASTU') ||
+                         tirListesi[0];
+        const renk = (enCritik.durum === 'tamamlandi' || enCritik.durum === 'TAMAMLANDI') ? '#22c55e' :
+                     (enCritik.durum === 'ulastu' || enCritik.durum === 'ULASTU') ? '#f59e0b' : '#3b82f6';
+        const tirSayisi = tirListesi.length;
 
         try {
           const line = L.polyline([kaynakKoord, hedefKoord], {
-            color: renk, weight: 2, opacity: 0.7,
-            dashArray: t.durum === 'yolda' ? '6,4' : null,
+            color: renk, weight: tirSayisi > 1 ? 3 : 2, opacity: 0.8,
+            dashArray: enCritik.durum === 'yolda' || enCritik.durum === 'YOLDA' ? '6,4' : null,
           }).addTo(leafletMap.current);
+
+          const tirlerHtml = tirListesi.map(t => {
+            const stokOzet = t.stoklar?.slice(0,2).map(s => `${s.urun_adi} (${s.miktar} ${s.birim})`).join(', ') || '—';
+            const tRenk = (t.durum === 'tamamlandi' || t.durum === 'TAMAMLANDI') ? '#22c55e' :
+                          (t.durum === 'ulastu' || t.durum === 'ULASTU') ? '#f59e0b' : '#3b82f6';
+            return `<div style="border-top:1px solid #1e2d47;padding-top:8px;margin-top:8px;">
+              <div style="font-weight:700;font-family:monospace;color:${tRenk};">${t.plaka}</div>
+              ${t.gonderen_adi ? `<div style="font-size:11px;color:#94a3b8;">👤 ${t.gonderen_adi}</div>` : ''}
+              <div style="font-size:11px;color:#94a3b8;margin-top:4px;">📦 ${stokOzet}</div>
+            </div>`;
+          }).join('');
+
+          line.bindPopup(`
+            <div style="font-family:sans-serif;min-width:240px;background:#111827;border-radius:8px;padding:12px;color:#e2e8f0;">
+              <div style="font-size:13px;font-weight:700;margin-bottom:4px;">
+                📤 ${t0.kaynak_merkez.ad} → 📥 ${t0.hedef_merkez.ad}
+              </div>
+              <div style="font-size:11px;color:#64748b;margin-bottom:8px;">
+                ${t0.kaynak_merkez.il} → ${t0.hedef_merkez.il} · ${tirSayisi} tır
+              </div>
+              ${tirlerHtml}
+            </div>
+          `);
           linesRef.current.push(line);
         } catch(e) {}
 
         const marker = L.circleMarker(hedefKoord, {
-          radius: 7, fillColor: renk, color: '#fff',
-          weight: 1.5, fillOpacity: 0.9,
+          radius: tirSayisi > 1 ? 10 : 7,
+          fillColor: renk, color: '#fff', weight: 1.5, fillOpacity: 0.9,
         }).addTo(leafletMap.current);
 
-        const stokOzet = t.stoklar?.slice(0, 3).map(s => `${s.urun_adi} (${s.miktar} ${s.birim})`).join(', ') || 'Stok bilgisi yok';
+        if (tirSayisi > 1) {
+          const icon = L.divIcon({
+            html: `<div style="background:${renk};color:white;border-radius:50%;width:20px;height:20px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;border:2px solid white;">${tirSayisi}</div>`,
+            iconSize: [20, 20], iconAnchor: [10, 10], className: ''
+          });
+          const numMarker = L.marker(hedefKoord, { icon }).addTo(leafletMap.current);
+          markersRef.current.push(numMarker);
+        }
+
         marker.bindPopup(`
           <div style="font-family:sans-serif;min-width:220px;background:#111827;border-radius:8px;padding:12px;color:#e2e8f0;">
-            <div style="font-size:14px;font-weight:700;margin-bottom:6px;">🚛 ${t.plaka}</div>
-            <div style="font-size:11px;color:${renk};text-transform:uppercase;margin-bottom:8px;">
-              ${t.durum === 'yolda' ? '⏳ Yolda' : t.durum === 'ulastu' ? '✅ Ulaştı' : '🏁 Tamamlandı'}
+            <div style="font-size:13px;font-weight:700;margin-bottom:4px;">
+              📥 ${t0.hedef_merkez.ad} (${t0.hedef_merkez.il})
             </div>
-            <div style="font-size:12px;color:#94a3b8;margin-bottom:2px;">📤 ${t.kaynak_merkez.ad} (${t.kaynak_merkez.il})</div>
-            <div style="font-size:12px;color:#94a3b8;margin-bottom:2px;">📥 ${t.hedef_merkez.ad} (${t.hedef_merkez.il})</div>
-            ${t.gonderen_adi ? `<div style="font-size:12px;color:#94a3b8;margin-bottom:2px;">👤 ${t.gonderen_adi}</div>` : ''}
-            <div style="font-size:12px;color:#94a3b8;margin-top:6px;border-top:1px solid #1e2d47;padding-top:6px;">📦 ${stokOzet}</div>
+            <div style="font-size:11px;color:#64748b;margin-bottom:8px;">${tirSayisi} tır bu noktaya geliyor</div>
+            ${tirListesi.map(t => `<div style="font-size:12px;color:#94a3b8;padding:4px 0;border-top:1px solid #1e2d47;">🚛 ${t.plaka} · ${t.durum}</div>`).join('')}
           </div>
         `);
         markersRef.current.push(marker);
@@ -208,6 +389,18 @@ export default function TurkiyeHaritasi({ merkezler = [], dagitimLog = [], mod =
         background: 'rgba(17,24,39,0.95)', border: '1px solid var(--border)',
         borderRadius: 8, padding: '10px 14px', fontSize: 12,
       }}>
+        {bolge && (
+          <div style={{ marginBottom: 8, paddingBottom: 8, borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+              <span style={{ width: 16, height: 10, background: 'rgba(59,130,246,0.3)', border: '2px solid #3b82f6', display: 'inline-block', borderRadius: 2 }} />
+              <span style={{ color: '#3b82f6', fontWeight: 600 }}>{bolge} Bölgesi</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ width: 16, height: 10, background: 'rgba(17,24,39,0.8)', border: '1px solid #374151', display: 'inline-block', borderRadius: 2 }} />
+              <span style={{ color: 'var(--text3)' }}>Diğer İller</span>
+            </div>
+          </div>
+        )}
         {mod === 'merkezler' ? (
           <>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>

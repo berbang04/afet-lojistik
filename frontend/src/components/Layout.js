@@ -2,29 +2,52 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { notifAPI } from '../api';
+import {
+  LayoutDashboard, Users, Building2, Map, Truck, BarChart3,
+  Package, ClipboardList, SendHorizonal, History, Bell, LogOut,
+  ChevronRight, UserCircle, Inbox
+} from 'lucide-react';
 
-const ROLE_LABELS = { admin: 'Yetkili', toplama: 'Toplama Merkezi', dagitim: 'Dağıtım Merkezi' };
+const ROLE_LABELS = { admin: 'Yetkili', toplama: 'Toplama Merkezi', dagitim: 'Dağıtım Merkezi', bolge_mudur: 'Bölge Müdürü', operasyon_mudur: 'Operasyon Müdürü' };
 
 const NAV_ITEMS = {
   admin: [
-    { path: '/admin', icon: '📊', label: 'Kontrol Paneli' },
-    { path: '/admin/kullanicilar', icon: '👥', label: 'Kullanıcılar' },
-    { path: '/admin/merkezler', icon: '🏢', label: 'Merkezler' },
-    { path: '/admin/harita', icon: '🗺️', label: 'Türkiye Haritası' },
-    { path: '/admin/dagitim-log', icon: '🚛', label: 'Dağıtım Operasyonları' },
+    { path: '/admin', icon: LayoutDashboard, label: 'Kontrol Paneli' },
+    { path: '/admin/kullanicilar', icon: Users, label: 'Kullanıcılar' },
+    { path: '/admin/merkezler', icon: Building2, label: 'Merkezler' },
+    { path: '/admin/harita', icon: Map, label: 'Türkiye Haritası' },
+    { path: '/admin/dagitim-log', icon: Truck, label: 'Dağıtım Operasyonları' },
+    { path: '/admin/rapor', icon: BarChart3, label: 'Raporlar' },
+    { path: '/admin/arac-sofor', icon: Truck, label: 'Araç & Şoför' },
+    { path: '/admin/bolge-yonetim', icon: Map, label: 'Bölge Yönetimi' },
   ],
   toplama: [
-    { path: '/toplama', icon: '📊', label: 'Kontrol Paneli' },
-    { path: '/toplama/stoklar', icon: '📦', label: 'Stok Yönetimi' },
-    { path: '/toplama/tirlar', icon: '🚛', label: 'Tır Takibi' },
-    { path: '/toplama/hareketler', icon: '📋', label: 'Hareket Geçmişi' },
+    { path: '/toplama', icon: LayoutDashboard, label: 'Kontrol Paneli' },
+    { path: '/toplama/stoklar', icon: Package, label: 'Stok Yönetimi' },
+    { path: '/toplama/tirlar', icon: Truck, label: 'Tır Takibi' },
+    { path: '/toplama/gonderim', icon: SendHorizonal, label: 'Gönderim Başlat' },
+    { path: '/toplama/hareketler', icon: History, label: 'Hareket Geçmişi' },
+  ],
+  bolge_mudur: [
+    { path: '/bolge', icon: LayoutDashboard, label: 'Kontrol Paneli' },
+    { path: '/bolge/merkezler', icon: Building2, label: 'Merkezler' },
+    { path: '/bolge/tirlar', icon: Truck, label: 'Tır Takibi' },
+    { path: '/bolge/stoklar', icon: Package, label: 'Stok Durumu' },
+    { path: '/bolge/harita', icon: Map, label: 'Operasyon Haritası' },
+  ],
+  operasyon_mudur: [
+    { path: '/operasyon', icon: LayoutDashboard, label: 'Operasyon Paneli' },
+    { path: '/bolge/merkezler', icon: Building2, label: 'Merkezler' },
+    { path: '/bolge/tirlar', icon: Truck, label: 'Tır Takibi' },
+    { path: '/bolge/stoklar', icon: Package, label: 'Stok Durumu' },
+    { path: '/bolge/harita', icon: Map, label: 'Operasyon Haritası' },
   ],
   dagitim: [
-    { path: '/dagitim', icon: '📊', label: 'Kontrol Paneli' },
-    { path: '/dagitim/stoklar', icon: '📦', label: 'Stok & Dağıtım' },
-    { path: '/dagitim/tirlar', icon: '🚛', label: 'Gelen Tırlar' },
-    { path: '/dagitim/istek', icon: '📨', label: 'İstek Gönder' },
-    { path: '/dagitim/hareketler', icon: '📋', label: 'Hareket Geçmişi' },
+    { path: '/dagitim', icon: LayoutDashboard, label: 'Kontrol Paneli' },
+    { path: '/dagitim/stoklar', icon: Package, label: 'Stok & Dağıtım' },
+    { path: '/dagitim/tirlar', icon: Inbox, label: 'Gelen Tırlar' },
+    { path: '/dagitim/istek', icon: SendHorizonal, label: 'İstek Gönder' },
+    { path: '/dagitim/hareketler', icon: History, label: 'Hareket Geçmişi' },
   ],
 };
 
@@ -37,7 +60,7 @@ export default function Layout({ children, title }) {
   const [unreadCount, setUnreadCount] = useState(0);
   const notifRef = useRef(null);
 
-  const role = user?.role;
+  const role = user?.role?.toLowerCase();
   const navItems = NAV_ITEMS[role] || [];
 
   useEffect(() => {
@@ -85,12 +108,9 @@ export default function Layout({ children, title }) {
     setUnreadCount(0);
   };
 
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
-  };
+  const handleLogout = () => { logout(); navigate('/login'); };
 
-  const badgeClass = { admin: 'badge-admin', toplama: 'badge-toplama', dagitim: 'badge-dagitim' }[role];
+  const badgeClass = { admin: 'badge-admin', toplama: 'badge-toplama', dagitim: 'badge-dagitim', bolge_mudur: 'badge-admin', operasyon_mudur: 'badge-admin' }[role];
 
   return (
     <div className="app-wrapper">
@@ -103,27 +123,37 @@ export default function Layout({ children, title }) {
 
         <nav className="sidebar-nav">
           <div className="nav-section">Menü</div>
-          {navItems.map(item => (
-            <div
-              key={item.path}
-              className={`nav-item ${location.pathname === item.path ? 'active' : ''}`}
-              onClick={() => navigate(item.path)}
-            >
-              <span className="icon">{item.icon}</span>
-              {item.label}
-            </div>
-          ))}
+          {navItems.map(item => {
+            const Icon = item.icon;
+            const isActive = location.pathname === item.path;
+            return (
+              <div
+                key={item.path}
+                className={`nav-item ${isActive ? 'active' : ''}`}
+                onClick={() => navigate(item.path)}
+              >
+                <span className="icon" style={{ display: 'flex', alignItems: 'center' }}>
+                  <Icon size={16} strokeWidth={1.8} />
+                </span>
+                {item.label}
+                {isActive && <ChevronRight size={14} style={{ marginLeft: 'auto', opacity: 0.5 }} />}
+              </div>
+            );
+          })}
         </nav>
 
         <div className="sidebar-footer">
           <div className="user-info">
-            <div className="user-name">{user?.ad} {user?.soyad}</div>
-            <div style={{ marginTop: 4 }}>
-              <span className={`badge-role ${badgeClass}`}>{ROLE_LABELS[role]}</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+              <UserCircle size={28} strokeWidth={1.5} style={{ color: 'var(--accent)', flexShrink: 0 }} />
+              <div>
+                <div className="user-name">{user?.ad} {user?.soyad}</div>
+                <span className={`badge-role ${badgeClass}`}>{ROLE_LABELS[role]}</span>
+              </div>
             </div>
           </div>
-          <button className="btn btn-secondary btn-sm" style={{ width: '100%' }} onClick={handleLogout}>
-            🚪 Çıkış Yap
+          <button className="btn btn-secondary btn-sm" style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }} onClick={handleLogout}>
+            <LogOut size={14} /> Çıkış Yap
           </button>
         </div>
       </aside>
@@ -135,7 +165,7 @@ export default function Layout({ children, title }) {
           <div className="topbar-actions">
             <div style={{ position: 'relative' }} ref={notifRef}>
               <button className="notif-btn" onClick={openNotifPanel}>
-                🔔
+                <Bell size={18} strokeWidth={1.8} />
                 {unreadCount > 0 && <span className="notif-badge">{unreadCount}</span>}
               </button>
 
@@ -144,11 +174,7 @@ export default function Layout({ children, title }) {
                   <div className="notif-panel-header">
                     BİLDİRİMLER
                     {unreadCount > 0 && (
-                      <button
-                        className="btn btn-sm btn-secondary"
-                        style={{ fontSize: 10 }}
-                        onClick={markAllRead}
-                      >
+                      <button className="btn btn-sm btn-secondary" style={{ fontSize: 10 }} onClick={markAllRead}>
                         Tümünü Oku
                       </button>
                     )}
@@ -167,7 +193,7 @@ export default function Layout({ children, title }) {
                         <div className="notif-item-title">{n.baslik}</div>
                         {n.gonderen_adi && (
                           <div style={{ fontSize: 11, color: 'var(--accent-blue)', marginBottom: 2, display: 'flex', alignItems: 'center', gap: 4 }}>
-                            <span>👤</span> {n.gonderen_adi}
+                            <UserCircle size={11} /> {n.gonderen_adi}
                           </div>
                         )}
                         <div className="notif-item-body">{n.icerik}</div>

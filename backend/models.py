@@ -1,3 +1,4 @@
+from datetime import datetime
 from sqlalchemy import (
     Column, Integer, String, Float, DateTime, ForeignKey,
     Boolean, Text, Enum as SAEnum
@@ -8,9 +9,11 @@ from database import Base
 import enum
 
 class UserRole(str, enum.Enum):
-    ADMIN = "admin"          # 1. tip - Yetkili
-    TOPLAMA = "toplama"      # 2. tip - Toplama Merkezi
-    DAGITIM = "dagitim"      # 3. tip - Dağıtım Merkezi
+    ADMIN = "admin"                    # Genel Müdür
+    BOLGE_MUDUR = "bolge_mudur"       # Bölge Müdürü
+    OPERASYON_MUDUR = "operasyon_mudur" # Operasyon Müdürü (acil bölge)
+    TOPLAMA = "toplama"                # Toplama Merkezi
+    DAGITIM = "dagitim"                # Dağıtım Merkezi
 
 class User(Base):
     __tablename__ = "users"
@@ -22,7 +25,8 @@ class User(Base):
     tc_kimlik = Column(String(11), unique=True)
     adres = Column(Text)
     hashed_password = Column(String(255), nullable=False)
-    role = Column(SAEnum(UserRole), nullable=False)
+    role = Column(SAEnum(UserRole, values_callable=lambda x: [e.value for e in x]), nullable=False)
+    bolge = Column(String(50), nullable=True)  # Bölge müdürü için: Marmara, Ege, vb.
     aktif = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
@@ -39,7 +43,7 @@ class Merkez(Base):
     __tablename__ = "merkezler"
     id = Column(Integer, primary_key=True, index=True)
     ad = Column(String(200), nullable=False)
-    tip = Column(SAEnum(MerkezTip), nullable=False)
+    tip = Column(SAEnum(MerkezTip, values_callable=lambda x: [e.value for e in x]), nullable=False)
     il = Column(String(100), nullable=False)
     ilce = Column(String(100), nullable=False)
     mahalle = Column(String(200))
@@ -48,6 +52,7 @@ class Merkez(Base):
     tam_adres = Column(Text)
     enlem = Column(Float, nullable=True)
     boylam = Column(Float, nullable=True)
+    bolge = Column(String(50), nullable=True)
     aktif = Column(Boolean, default=True)
     yetkili_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
@@ -83,7 +88,7 @@ class StokHareketi(Base):
     id = Column(Integer, primary_key=True, index=True)
     stok_id = Column(Integer, ForeignKey("stoklar.id"), nullable=False)
     merkez_id = Column(Integer, ForeignKey("merkezler.id"), nullable=False)
-    hareket_tip = Column(SAEnum(HareketTip), nullable=False)
+    hareket_tip = Column(SAEnum(HareketTip, values_callable=lambda x: [e.value for e in x]), nullable=False)
     miktar = Column(Integer, nullable=False)
     onceki_miktar = Column(Integer)
     sonraki_miktar = Column(Integer)
@@ -110,7 +115,7 @@ class Tir(Base):
     sofor_telefon = Column(String(20))
     kaynak_merkez_id = Column(Integer, ForeignKey("merkezler.id"), nullable=True)
     hedef_merkez_id = Column(Integer, ForeignKey("merkezler.id"), nullable=False)
-    durum = Column(SAEnum(TirDurum), default=TirDurum.YOLDA)
+    durum = Column(SAEnum(TirDurum, values_callable=lambda x: [e.value for e in x]), default=TirDurum.YOLDA)
     aciklama = Column(Text)
     kayit_yapan_id = Column(Integer, ForeignKey("users.id"))
     ulaşma_zamani = Column(DateTime(timezone=True), nullable=True)
@@ -153,3 +158,51 @@ class TamamlananDagitim(Base):
     toplama_merkez = relationship("Merkez", foreign_keys=[toplama_merkez_id])
     dagitim_merkez = relationship("Merkez", foreign_keys=[dagitim_merkez_id])
     tamamlayan = relationship("User")
+
+# ── Araç ve Şoför Modelleri ──────────────────────────────────────────
+
+class AracTip(str, enum.Enum):
+    PICKUP = "pickup"
+    KAMYONET = "kamyonet"
+    KAMYON = "kamyon"
+    TIR = "tir"
+
+class AracDurum(str, enum.Enum):
+    MUSAIT = "musait"
+    YOLDA = "yolda"
+    BAKIM = "bakim"
+
+class EhlivetTipi(str, enum.Enum):
+    B = "B"
+    C = "C"
+    E = "E"
+
+class SoforDurum(str, enum.Enum):
+    MUSAIT = "musait"
+    GOREVDE = "gorevde"
+    IZINLI = "izinli"
+
+class Arac(Base):
+    __tablename__ = "araclar"
+    id = Column(Integer, primary_key=True, index=True)
+    plaka = Column(String(20), unique=True, nullable=False)
+    tip = Column(SAEnum(AracTip, values_callable=lambda x: [e.value for e in x]), nullable=False)
+    marka = Column(String(100))
+    model = Column(String(100))
+    kapasite_kg = Column(Integer, nullable=False)
+    min_ehliyet = Column(SAEnum(EhlivetTipi, values_callable=lambda x: [e.value for e in x]), nullable=False)
+    durum = Column(SAEnum(AracDurum, values_callable=lambda x: [e.value for e in x]), default=AracDurum.MUSAIT)
+    aktif = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+class Sofor(Base):
+    __tablename__ = "soforler"
+    id = Column(Integer, primary_key=True, index=True)
+    ad = Column(String(100), nullable=False)
+    soyad = Column(String(100), nullable=False)
+    telefon = Column(String(20))
+    ehliyet_tipi = Column(SAEnum(EhlivetTipi, values_callable=lambda x: [e.value for e in x]), nullable=False)
+    ehliyet_no = Column(String(50))
+    durum = Column(SAEnum(SoforDurum, values_callable=lambda x: [e.value for e in x]), default=SoforDurum.MUSAIT)
+    aktif = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)

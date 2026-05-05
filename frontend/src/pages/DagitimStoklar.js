@@ -8,10 +8,15 @@ export default function DagitimStoklar() {
   const [stoklar, setStoklar] = useState([]);
   const [loading, setLoading] = useState(true);
   const [girisModal, setGirisModal] = useState(false);
-  const [dagitModal, setDagitModal] = useState(null); // stok objesi
+  const [dagitModal, setDagitModal] = useState(null);
   const [form, setForm] = useState(emptyGiris);
-  const [dagitMiktar, setDagitMiktar] = useState('');
-  const [dagitAciklama, setDagitAciklama] = useState('');
+  const [dagitForm, setDagitForm] = useState({
+    miktar: '',
+    aciklama: '',
+    dagitim_yeri: '',
+    kisi_sayisi: '',
+    dagitim_tarihi: new Date().toISOString().slice(0, 10),
+  });
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState(null);
   const [search, setSearch] = useState('');
@@ -36,6 +41,7 @@ export default function DagitimStoklar() {
   };
 
   const handleChange = e => setForm(f => ({ ...f, [e.target.name]: e.target.value }));
+  const handleDagitChange = e => setDagitForm(f => ({ ...f, [e.target.name]: e.target.value }));
 
   const handleGiris = async (e) => {
     e.preventDefault();
@@ -57,14 +63,20 @@ export default function DagitimStoklar() {
   };
 
   const handleDagit = async () => {
-    if (!dagitMiktar || Number(dagitMiktar) <= 0) return;
+    if (!dagitForm.miktar || Number(dagitForm.miktar) <= 0) return;
     setSaving(true);
     try {
-      await dagitimAPI.dagit(dagitModal.id, Number(dagitMiktar), dagitAciklama);
-      setMsg({ type: 'success', text: `✅ ${Number(dagitMiktar)} adet dağıtıldı` });
+      const aciklama = [
+        dagitForm.aciklama,
+        dagitForm.dagitim_yeri ? `Yer: ${dagitForm.dagitim_yeri}` : '',
+        dagitForm.kisi_sayisi ? `Kişi sayısı: ${dagitForm.kisi_sayisi}` : '',
+        dagitForm.dagitim_tarihi ? `Tarih: ${dagitForm.dagitim_tarihi}` : '',
+      ].filter(Boolean).join(' | ');
+
+      await dagitimAPI.dagit(dagitModal.id, Number(dagitForm.miktar), aciklama);
+      setMsg({ type: 'success', text: `✅ ${Number(dagitForm.miktar)} adet dağıtıldı` });
       setDagitModal(null);
-      setDagitMiktar('');
-      setDagitAciklama('');
+      setDagitForm({ miktar: '', aciklama: '', dagitim_yeri: '', kisi_sayisi: '', dagitim_tarihi: new Date().toISOString().slice(0, 10) });
       fetchStoklar();
       setTimeout(() => setMsg(null), 2000);
     } catch (err) {
@@ -80,6 +92,8 @@ export default function DagitimStoklar() {
 
   return (
     <Layout title="Stok & Dağıtım">
+      {msg && !dagitModal && <div className={`alert alert-${msg.type}`} style={{ marginBottom: 16 }}>{msg.text}</div>}
+
       <div className="card">
         <div className="card-header">
           <div className="card-title">Mevcut Stok ({stoklar.length})</div>
@@ -125,9 +139,7 @@ export default function DagitimStoklar() {
                     <td>{s.kategori ? <span className="badge badge-neutral">{s.kategori}</span> : '—'}</td>
                     <td>
                       <span style={{
-                        fontFamily: 'IBM Plex Mono',
-                        fontWeight: 700,
-                        fontSize: 15,
+                        fontFamily: 'IBM Plex Mono', fontWeight: 700, fontSize: 15,
                         color: s.adet <= 10 ? 'var(--danger)' : s.adet <= 50 ? 'var(--warning)' : 'var(--accent3)'
                       }}>
                         {s.adet}
@@ -140,7 +152,10 @@ export default function DagitimStoklar() {
                     <td>
                       <button
                         className="btn btn-success btn-sm"
-                        onClick={() => { setDagitModal(s); setDagitMiktar(''); setDagitAciklama(''); }}
+                        onClick={() => {
+                          setDagitModal(s);
+                          setDagitForm({ miktar: '', aciklama: '', dagitim_yeri: '', kisi_sayisi: '', dagitim_tarihi: new Date().toISOString().slice(0, 10) });
+                        }}
                         disabled={s.adet === 0}
                       >
                         🚚 Dağıt
@@ -225,49 +240,81 @@ export default function DagitimStoklar() {
         </div>
       )}
 
-      {/* Dağıtım Modal */}
+      {/* Dağıtım Modal — Genişletilmiş */}
       {dagitModal && (
         <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setDagitModal(null)}>
-          <div className="modal" style={{ maxWidth: 400 }}>
+          <div className="modal" style={{ maxWidth: 480 }}>
             <div className="modal-header">
-              <div className="modal-title">Dağıtım Yap</div>
+              <div className="modal-title">🚚 Dağıtım Kaydı</div>
               <button className="modal-close" onClick={() => setDagitModal(null)}>✕</button>
             </div>
+
+            {/* Ürün bilgisi */}
             <div style={{ background: 'var(--bg3)', borderRadius: 8, padding: '12px 14px', marginBottom: 16 }}>
-              <div style={{ fontWeight: 600 }}>{dagitModal.urun_adi}</div>
+              <div style={{ fontWeight: 600, fontSize: 15 }}>{dagitModal.urun_adi}</div>
               <div style={{ fontSize: 12, color: 'var(--text2)', marginTop: 4 }}>
                 Mevcut stok: <strong style={{ color: 'var(--accent3)', fontFamily: 'IBM Plex Mono' }}>{dagitModal.adet}</strong> {dagitModal.birim}
               </div>
             </div>
+
+            {msg && <div className={`alert alert-${msg.type}`}>{msg.text}</div>}
+
+            <div className="form-row">
+              <div className="form-group">
+                <label className="form-label">Dağıtılacak Miktar *</label>
+                <input
+                  type="number" name="miktar" min="1" max={dagitModal.adet}
+                  className="form-control" value={dagitForm.miktar}
+                  onChange={handleDagitChange} autoFocus
+                  placeholder={`Maks. ${dagitModal.adet}`}
+                />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Dağıtım Tarihi *</label>
+                <input
+                  type="date" name="dagitim_tarihi"
+                  className="form-control" value={dagitForm.dagitim_tarihi}
+                  onChange={handleDagitChange}
+                />
+              </div>
+            </div>
+
             <div className="form-group">
-              <label className="form-label">Dağıtılacak Miktar *</label>
+              <label className="form-label">Dağıtım Yeri</label>
               <input
-                type="number"
-                min="1"
-                max={dagitModal.adet}
-                className="form-control"
-                value={dagitMiktar}
-                onChange={e => setDagitMiktar(e.target.value)}
-                autoFocus
+                name="dagitim_yeri" className="form-control"
+                value={dagitForm.dagitim_yeri} onChange={handleDagitChange}
+                placeholder="Mahalle, köy, alan adı..."
               />
             </div>
-            <div className="form-group">
-              <label className="form-label">Açıklama</label>
-              <input
-                className="form-control"
-                value={dagitAciklama}
-                onChange={e => setDagitAciklama(e.target.value)}
-                placeholder="Dağıtım yeri, kişi sayısı vb."
-              />
+
+            <div className="form-row">
+              <div className="form-group">
+                <label className="form-label">Faydalanan Kişi Sayısı</label>
+                <input
+                  type="number" name="kisi_sayisi" min="0"
+                  className="form-control" value={dagitForm.kisi_sayisi}
+                  onChange={handleDagitChange} placeholder="0"
+                />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Açıklama</label>
+                <input
+                  name="aciklama" className="form-control"
+                  value={dagitForm.aciklama} onChange={handleDagitChange}
+                  placeholder="Notlar..."
+                />
+              </div>
             </div>
+
             <div className="modal-footer">
               <button className="btn btn-secondary" onClick={() => setDagitModal(null)}>İptal</button>
               <button
                 className="btn btn-success"
                 onClick={handleDagit}
-                disabled={saving || !dagitMiktar}
+                disabled={saving || !dagitForm.miktar}
               >
-                {saving ? 'İşleniyor...' : '🚚 Dağıtımı Onayla'}
+                {saving ? 'İşleniyor...' : '✅ Dağıtımı Onayla'}
               </button>
             </div>
           </div>

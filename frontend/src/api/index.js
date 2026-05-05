@@ -43,11 +43,34 @@ export const adminAPI = {
   // Harita
   getHaritaMerkezler: () => api.get('/admin/harita/merkezler'),
   getHaritaDagitimLog: () => api.get('/admin/harita/dagitim-log'),
+  // Araç & Şoför
+  getAraclar: () => api.get('/araclar'),
+  createArac: (data) => api.post('/araclar', data),
+  updateArac: (id, data) => api.put('/araclar/' + id, data),
+  deleteArac: (id) => api.delete('/araclar/' + id),
+  getSoforler: () => api.get('/soforler'),
+  createSofor: (data) => api.post('/soforler', data),
+  updateSofor: (id, data) => api.put('/soforler/' + id, data),
+  deleteSofor: (id) => api.delete('/soforler/' + id),
+  getAracOneri: (params) => api.get('/arac-oneri', { params }),
+  getEhlivetKontrol: (arac_id, sofor_id) => api.get('/ehliyet-kontrol', { params: { arac_id, sofor_id } }),
+  // Bölge Yönetimi
+  getBolgeler: () => api.get('/admin/bolgeler'),
+  createBolge: (data) => api.post('/admin/bolgeler', data),
+  updateBolge: (id, data) => api.put('/admin/bolgeler/' + id, data),
+  deleteBolge: (id) => api.delete('/admin/bolgeler/' + id),
+  getBolgeIcinMerkezler: (id) => api.get('/admin/bolgeler/' + id + '/merkezler'),
 };
 
 // ── Toplama ───────────────────────────────────────────────────────────
 export const toplamaAPI = {
   getMerkezBilgi: () => api.get('/toplama/merkez-bilgi'),
+  getUrunKatalogu: (q, kategori) => api.get('/toplama/urun-katalogu', { params: { q, kategori } }),
+  getAraclar: () => api.get('/araclar'),
+  getSoforler: () => api.get('/soforler'),
+  getAracOneri: (params) => api.get('/arac-oneri', { params }),
+  getEhlivetKontrol: (arac_id, sofor_id) => api.get('/ehliyet-kontrol', { params: { arac_id, sofor_id } }),
+  getUrunKategoriler: () => api.get('/toplama/urun-kategoriler'),
   getDagitimMerkezleri: () => api.get('/toplama/dagitim-merkezleri'),
   getStoklar: () => api.get('/toplama/stoklar'),
   addStok: (data) => api.post('/toplama/stoklar', data),
@@ -59,6 +82,7 @@ export const toplamaAPI = {
   tirUlasti: (id) => api.put(`/toplama/tirlar/${id}/ulasti`),
   tirSil: (id) => api.delete(`/toplama/tirlar/${id}`),
   tirOlusturVeGonder: (data) => api.post('/toplama/tirlar-olustur-ve-gonder', data),
+  getTirManifesto: (id) => api.get(`/toplama/tirlar/${id}/manifesto`),
 };
 
 // ── Dağıtım ───────────────────────────────────────────────────────────
@@ -82,6 +106,16 @@ export const notifAPI = {
   getSayi: () => api.get('/notifications/okunmamis-sayisi'),
   okundu: (id) => api.put(`/notifications/${id}/okundu`),
   tumunuOku: () => api.put('/notifications/tümünü-okundu'),
+};
+
+
+// ── Bölge Müdürü ─────────────────────────────────────────────────────
+export const bolgeAPI = {
+  getDashboard: () => api.get('/bolge/dashboard'),
+  getMerkezler: () => api.get('/bolge/merkezler'),
+  getTirlar: () => api.get('/bolge/tirlar'),
+  getStoklar: () => api.get('/bolge/stoklar'),
+  getHarita: () => api.get('/bolge/harita'),
 };
 
 export default api;

@@ -5,11 +5,16 @@ import { adminAPI } from '../api';
 const ROLES = [
   { value: 'toplama', label: 'Toplama Merkezi Yetkilisi' },
   { value: 'dagitim', label: 'Dağıtım Merkezi Yetkilisi' },
+  { value: 'bolge_mudur', label: 'Bölge Müdürü' },
+];
+
+const BOLGELER = [
+  'Marmara', 'Ege', 'Akdeniz', 'İç Anadolu', 'Karadeniz', 'Doğu Anadolu', 'Güneydoğu Anadolu',
 ];
 
 const emptyForm = {
   ad: '', soyad: '', email: '', telefon: '',
-  tc_kimlik: '', adres: '', password: '', role: 'toplama'
+  tc_kimlik: '', adres: '', password: '', role: 'toplama', bolge: '',
 };
 
 export default function AdminKullanicilar() {
@@ -77,8 +82,10 @@ export default function AdminKullanicilar() {
     } catch {}
   };
 
-  const roleLabel = (r) => r === 'toplama' ? 'Toplama' : r === 'dagitim' ? 'Dağıtım' : r;
-  const roleBadge = (r) => r === 'toplama' ? 'badge-info' : r === 'dagitim' ? 'badge-success' : 'badge-neutral';
+  const roleLabel = (r) =>
+    r === 'toplama' ? 'Toplama' : r === 'dagitim' ? 'Dağıtım' : r === 'bolge_mudur' ? 'Bölge Müdürü' : r;
+  const roleBadge = (r) =>
+    r === 'toplama' ? 'badge-info' : r === 'dagitim' ? 'badge-success' : r === 'bolge_mudur' ? 'badge-warning' : 'badge-neutral';
 
   return (
     <Layout title="Kullanıcı Yönetimi">
@@ -106,6 +113,7 @@ export default function AdminKullanicilar() {
                   <th>TC Kimlik</th>
                   <th>Telefon</th>
                   <th>Rol</th>
+                  <th>Bölge</th>
                   <th>Durum</th>
                   <th>İşlem</th>
                 </tr>
@@ -119,6 +127,7 @@ export default function AdminKullanicilar() {
                     <td style={{ fontFamily: 'IBM Plex Mono', fontSize: 12 }}>{u.tc_kimlik || '—'}</td>
                     <td>{u.telefon || '—'}</td>
                     <td><span className={`badge ${roleBadge(u.role)}`}>{roleLabel(u.role)}</span></td>
+                    <td>{u.bolge || <span style={{ color: 'var(--text3)' }}>—</span>}</td>
                     <td>
                       <span className={`badge ${u.aktif ? 'badge-success' : 'badge-danger'}`}>
                         {u.aktif ? 'Aktif' : 'Pasif'}
@@ -201,6 +210,16 @@ export default function AdminKullanicilar() {
                   />
                 </div>
               </div>
+
+              {form.role === 'bolge_mudur' && (
+                <div className="form-group">
+                  <label className="form-label">Bölge *</label>
+                  <select name="bolge" className="form-control" value={form.bolge} onChange={handleChange} required>
+                    <option value="">— Bölge Seçin —</option>
+                    {BOLGELER.map(b => <option key={b} value={b}>{b}</option>)}
+                  </select>
+                </div>
+              )}
 
               <div className="modal-footer">
                 <button type="button" className="btn btn-secondary" onClick={closeModal}>İptal</button>

@@ -2,31 +2,52 @@ import { useEffect, useState, useCallback } from 'react';
 import Layout from '../components/Layout';
 import { adminAPI } from '../api';
 
+const IL_BOLGE = {
+  'İstanbul': 'Marmara', 'Bursa': 'Marmara', 'Tekirdağ': 'Marmara',
+  'Edirne': 'Marmara', 'Kırklareli': 'Marmara', 'Balıkesir': 'Marmara',
+  'Çanakkale': 'Marmara', 'Yalova': 'Marmara', 'Kocaeli': 'Marmara',
+  'Sakarya': 'Marmara', 'Düzce': 'Marmara', 'Bilecik': 'Marmara',
+  'İzmir': 'Ege', 'Aydın': 'Ege', 'Denizli': 'Ege', 'Manisa': 'Ege',
+  'Muğla': 'Ege', 'Uşak': 'Ege', 'Afyonkarahisar': 'Ege', 'Kütahya': 'Ege',
+  'Antalya': 'Akdeniz', 'Adana': 'Akdeniz', 'Mersin': 'Akdeniz',
+  'Hatay': 'Akdeniz', 'Kahramanmaraş': 'Akdeniz', 'Osmaniye': 'Akdeniz',
+  'Burdur': 'Akdeniz', 'Isparta': 'Akdeniz',
+  'Ankara': 'İç Anadolu', 'Konya': 'İç Anadolu', 'Kayseri': 'İç Anadolu',
+  'Sivas': 'İç Anadolu', 'Yozgat': 'İç Anadolu', 'Kırıkkale': 'İç Anadolu',
+  'Kırşehir': 'İç Anadolu', 'Nevşehir': 'İç Anadolu', 'Niğde': 'İç Anadolu',
+  'Aksaray': 'İç Anadolu', 'Karaman': 'İç Anadolu', 'Eskişehir': 'İç Anadolu',
+  'Çankırı': 'İç Anadolu',
+  'Samsun': 'Karadeniz', 'Trabzon': 'Karadeniz', 'Ordu': 'Karadeniz',
+  'Giresun': 'Karadeniz', 'Rize': 'Karadeniz', 'Artvin': 'Karadeniz',
+  'Zonguldak': 'Karadeniz', 'Bartın': 'Karadeniz', 'Kastamonu': 'Karadeniz',
+  'Sinop': 'Karadeniz', 'Çorum': 'Karadeniz', 'Amasya': 'Karadeniz',
+  'Tokat': 'Karadeniz', 'Gümüşhane': 'Karadeniz', 'Bayburt': 'Karadeniz',
+  'Karabük': 'Karadeniz', 'Bolu': 'Karadeniz',
+  'Malatya': 'Doğu Anadolu', 'Elazığ': 'Doğu Anadolu', 'Van': 'Doğu Anadolu',
+  'Erzurum': 'Doğu Anadolu', 'Erzincan': 'Doğu Anadolu', 'Tunceli': 'Doğu Anadolu',
+  'Bingöl': 'Doğu Anadolu', 'Bitlis': 'Doğu Anadolu', 'Muş': 'Doğu Anadolu',
+  'Hakkari': 'Doğu Anadolu', 'Iğdır': 'Doğu Anadolu', 'Kars': 'Doğu Anadolu',
+  'Ardahan': 'Doğu Anadolu', 'Ağrı': 'Doğu Anadolu',
+  'Gaziantep': 'Güneydoğu Anadolu', 'Şanlıurfa': 'Güneydoğu Anadolu',
+  'Diyarbakır': 'Güneydoğu Anadolu', 'Mardin': 'Güneydoğu Anadolu',
+  'Batman': 'Güneydoğu Anadolu', 'Şırnak': 'Güneydoğu Anadolu',
+  'Siirt': 'Güneydoğu Anadolu', 'Kilis': 'Güneydoğu Anadolu',
+  'Adıyaman': 'Güneydoğu Anadolu',
+};
+
 const emptyForm = {
   ad: '', tip: 'toplama', il: '', ilce: '',
   mahalle: '', sokak: '', bina_no: '', tam_adres: '',
-  enlem: '', boylam: '', yetkili_id: ''
+  enlem: '', boylam: '', yetkili_id: '', bolge: ''
 };
 
-// Nominatim ile adres → koordinat
 async function adresTanımla(form) {
-  const parcalar = [
-    form.bina_no && `${form.bina_no}`,
-    form.sokak,
-    form.mahalle,
-    form.ilce,
-    form.il,
-    'Türkiye'
-  ].filter(Boolean);
-
+  const parcalar = [form.bina_no, form.sokak, form.mahalle, form.ilce, form.il, 'Türkiye'].filter(Boolean);
   const sorgu = parcalar.join(', ');
   const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(sorgu)}&format=json&limit=1&countrycodes=tr`;
-
   const res = await fetch(url, { headers: { 'Accept-Language': 'tr' } });
   const data = await res.json();
-  if (data.length > 0) {
-    return { enlem: parseFloat(data[0].lat), boylam: parseFloat(data[0].lon), bulunan: data[0].display_name };
-  }
+  if (data.length > 0) return { enlem: parseFloat(data[0].lat), boylam: parseFloat(data[0].lon), bulunan: data[0].display_name };
   return null;
 }
 
@@ -62,29 +83,35 @@ export default function AdminMerkezler() {
   };
   const openEdit = (m) => {
     setEditMerkez(m);
-    setForm({ ...m, yetkili_id: m.yetkili_id || '', enlem: m.enlem || '', boylam: m.boylam || '' });
+    setForm({ ...m, yetkili_id: m.yetkili_id || '', enlem: m.enlem || '', boylam: m.boylam || '', bolge: m.bolge || '' });
     setKoordinatBulundu(null); setModalOpen(true);
   };
   const closeModal = () => { setModalOpen(false); setMsg(null); setKoordinatBulundu(null); };
 
-  const handleChange = e => setForm(f => ({ ...f, [e.target.name]: e.target.value }));
+  // il değişince bölge otomatik ata
+  const handleChange = e => {
+    const { name, value } = e.target;
+    setForm(f => {
+      const updated = { ...f, [name]: value };
+      if (name === 'il') {
+        updated.bolge = IL_BOLGE[value] || '';
+      }
+      return updated;
+    });
+  };
 
-  // Otomatik koordinat bul
   const handleKoordinatBul = useCallback(async () => {
     if (!form.il) { setMsg({ type: 'warning', text: 'En az il bilgisi gerekli.' }); return; }
-    setKoordinatBuluyor(true);
-    setMsg(null);
+    setKoordinatBuluyor(true); setMsg(null);
     try {
       const sonuc = await adresTanımla(form);
       if (sonuc) {
         setForm(f => ({ ...f, enlem: sonuc.enlem, boylam: sonuc.boylam }));
         setKoordinatBulundu(sonuc.bulunan);
       } else {
-        setMsg({ type: 'danger', text: 'Adres bulunamadı. İl/ilçe bilgilerini kontrol edin.' });
+        setMsg({ type: 'danger', text: 'Adres bulunamadı.' });
       }
-    } catch {
-      setMsg({ type: 'danger', text: 'Koordinat servisi ulaşılamıyor.' });
-    }
+    } catch { setMsg({ type: 'danger', text: 'Koordinat servisi ulaşılamıyor.' }); }
     setKoordinatBuluyor(false);
   }, [form]);
 
@@ -97,6 +124,7 @@ export default function AdminMerkezler() {
         yetkili_id: form.yetkili_id ? Number(form.yetkili_id) : null,
         enlem: form.enlem ? parseFloat(form.enlem) : null,
         boylam: form.boylam ? parseFloat(form.boylam) : null,
+        bolge: form.bolge || IL_BOLGE[form.il] || '',
       };
       if (editMerkez) {
         await adminAPI.updateMerkez(editMerkez.id, payload);
@@ -152,14 +180,8 @@ export default function AdminMerkezler() {
             <table>
               <thead>
                 <tr>
-                  <th>#</th>
-                  <th>Merkez Adı</th>
-                  <th>Tip</th>
-                  <th>İl / İlçe</th>
-                  <th>Adres</th>
-                  <th>Koordinat</th>
-                  <th>Yetkili</th>
-                  <th>İşlem</th>
+                  <th>#</th><th>Merkez Adı</th><th>Tip</th><th>İl / İlçe</th>
+                  <th>Bölge</th><th>Koordinat</th><th>Yetkili</th><th>İşlem</th>
                 </tr>
               </thead>
               <tbody>
@@ -173,8 +195,10 @@ export default function AdminMerkezler() {
                       </span>
                     </td>
                     <td>{m.il} / {m.ilce}</td>
-                    <td style={{ fontSize: 12, color: 'var(--text2)' }}>
-                      {[m.mahalle, m.sokak, m.bina_no ? `No:${m.bina_no}` : ''].filter(Boolean).join(', ') || m.tam_adres || '—'}
+                    <td>
+                      {m.bolge
+                        ? <span className="badge badge-neutral">{m.bolge}</span>
+                        : <span style={{ color: 'var(--text3)', fontSize: 12 }}>—</span>}
                     </td>
                     <td style={{ fontSize: 11, fontFamily: 'IBM Plex Mono' }}>
                       {m.enlem && m.boylam
@@ -216,7 +240,7 @@ export default function AdminMerkezler() {
               <div className="form-row">
                 <div className="form-group">
                   <label className="form-label">Merkez Adı *</label>
-                  <input name="ad" className="form-control" value={form.ad} onChange={handleChange} required placeholder="Örn: İzmir Buca Dağıtım Merkezi" />
+                  <input name="ad" className="form-control" value={form.ad} onChange={handleChange} required placeholder="Örn: Trabzon Akçaabat Dağıtım Merkezi" />
                 </div>
                 <div className="form-group">
                   <label className="form-label">Merkez Tipi *</label>
@@ -230,18 +254,25 @@ export default function AdminMerkezler() {
               <div className="form-row">
                 <div className="form-group">
                   <label className="form-label">İl *</label>
-                  <input name="il" className="form-control" value={form.il} onChange={handleChange} required placeholder="Örn: İzmir" />
+                  <input name="il" className="form-control" value={form.il} onChange={handleChange} required placeholder="Örn: Trabzon" />
                 </div>
                 <div className="form-group">
                   <label className="form-label">İlçe *</label>
-                  <input name="ilce" className="form-control" value={form.ilce} onChange={handleChange} required placeholder="Örn: Buca" />
+                  <input name="ilce" className="form-control" value={form.ilce} onChange={handleChange} required placeholder="Örn: Akçaabat" />
                 </div>
               </div>
+
+              {/* Bölge otomatik göster */}
+              {form.bolge && (
+                <div style={{ marginBottom: 12, padding: '8px 12px', background: 'rgba(59,130,246,0.1)', borderRadius: 6, border: '1px solid rgba(59,130,246,0.3)', fontSize: 13 }}>
+                  🗺️ Bölge otomatik atandı: <strong style={{ color: 'var(--accent-blue)' }}>{form.bolge}</strong>
+                </div>
+              )}
 
               <div className="form-row-3">
                 <div className="form-group">
                   <label className="form-label">Mahalle</label>
-                  <input name="mahalle" className="form-control" value={form.mahalle} onChange={handleChange} placeholder="Örn: Çamdibi Mah." />
+                  <input name="mahalle" className="form-control" value={form.mahalle} onChange={handleChange} placeholder="Örn: Merkez Mah." />
                 </div>
                 <div className="form-group">
                   <label className="form-label">Sokak</label>
@@ -253,17 +284,10 @@ export default function AdminMerkezler() {
                 </div>
               </div>
 
-              {/* Koordinat Bul Butonu */}
               <div className="form-group">
                 <label className="form-label">Harita Konumu</label>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', flexDirection: 'column' }}>
-                  <button
-                    type="button"
-                    className="btn btn-secondary"
-                    onClick={handleKoordinatBul}
-                    disabled={koordinatBuluyor || !form.il}
-                    style={{ width: '100%' }}
-                  >
+                  <button type="button" className="btn btn-secondary" onClick={handleKoordinatBul} disabled={koordinatBuluyor || !form.il} style={{ width: '100%' }}>
                     {koordinatBuluyor ? '🔍 Adres aranıyor...' : '📍 Adresi Haritada Bul (Otomatik)'}
                   </button>
                   {koordinatBulundu && (
@@ -272,25 +296,8 @@ export default function AdminMerkezler() {
                     </div>
                   )}
                   <div style={{ display: 'flex', gap: 8, width: '100%' }}>
-                    <div style={{ flex: 1 }}>
-                      <input
-                        name="enlem" className="form-control"
-                        value={form.enlem} onChange={handleChange}
-                        placeholder="Enlem (örn: 38.4192)"
-                        style={{ fontSize: 12 }}
-                      />
-                    </div>
-                    <div style={{ flex: 1 }}>
-                      <input
-                        name="boylam" className="form-control"
-                        value={form.boylam} onChange={handleChange}
-                        placeholder="Boylam (örn: 27.1297)"
-                        style={{ fontSize: 12 }}
-                      />
-                    </div>
-                  </div>
-                  <div style={{ fontSize: 11, color: 'var(--text3)' }}>
-                    İl/ilçe/mahalle/sokak yazıp "Haritada Bul" butonuna basın, koordinatlar otomatik doldurulur.
+                    <input name="enlem" className="form-control" value={form.enlem} onChange={handleChange} placeholder="Enlem" style={{ fontSize: 12 }} />
+                    <input name="boylam" className="form-control" value={form.boylam} onChange={handleChange} placeholder="Boylam" style={{ fontSize: 12 }} />
                   </div>
                 </div>
               </div>

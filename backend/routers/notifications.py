@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from database import get_db
 from auth_utils import get_current_user
@@ -12,12 +12,23 @@ def bildirim_to_dict(b: models.Bildirim, db: Session):
         g = db.query(models.User).filter(models.User.id == b.gonderen_id).first()
         if g:
             gonderen_adi = f"{g.ad} {g.soyad}"
+
+    kaynak_merkez_adi = None
+    kaynak_merkez_il = None
+    if b.kaynak_merkez_id:
+        m = db.query(models.Merkez).filter(models.Merkez.id == b.kaynak_merkez_id).first()
+        if m:
+            kaynak_merkez_adi = m.ad
+            kaynak_merkez_il = m.il
+
     return {
         "id": b.id,
         "baslik": b.baslik,
         "icerik": b.icerik,
         "tip": b.tip,
         "kaynak_merkez_id": b.kaynak_merkez_id,
+        "kaynak_merkez_adi": kaynak_merkez_adi,
+        "kaynak_merkez_il": kaynak_merkez_il,
         "gonderen_id": b.gonderen_id,
         "gonderen_adi": gonderen_adi,
         "okundu": b.okundu,
@@ -71,3 +82,30 @@ def tumunu_okundu_isaretle(
     ).update({"okundu": True})
     db.commit()
     return {"detail": "Tüm bildirimler okundu olarak işaretlendi"}
+
+@router.delete("/{bildirim_id}")
+def bildirimi_sil(
+    bildirim_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    bildirim = db.query(models.Bildirim).filter(
+        models.Bildirim.id == bildirim_id,
+        models.Bildirim.alici_id == current_user.id
+    ).first()
+    if not bildirim:
+        raise HTTPException(status_code=404, detail="Bildirim bulunamadı")
+    db.delete(bildirim)
+    db.commit()
+    return {"detail": "Bildirim silindi"}
+
+@router.delete("/")
+def tumunu_sil(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    db.query(models.Bildirim).filter(
+        models.Bildirim.alici_id == current_user.id
+    ).delete()
+    db.commit()
+    return {"detail": "Tüm bildirimler silindi"}

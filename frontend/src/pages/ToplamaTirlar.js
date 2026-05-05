@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import Layout from '../components/Layout';
 import { toplamaAPI } from '../api';
+import TirManifesto from '../components/TirManifesto';
 
 const emptyForm = { plaka: '', sofor_ad: '', sofor_telefon: '', hedef_merkez_id: '', aciklama: '', stoklar: [] };
 
@@ -179,6 +180,7 @@ export default function ToplamaTirlar() {
                         {new Date(t.created_at).toLocaleString('tr-TR')}
                       </td>
                       <td>
+                        <TirManifesto tirId={t.id} plaka={t.plaka} />
                         <button
                           className="btn btn-danger btn-sm"
                           onClick={() => handleSilTir(t.id)}
