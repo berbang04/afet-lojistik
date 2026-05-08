@@ -1,6 +1,88 @@
 # 🚨 Afet Sonrası Lojistik Yönetim Sistemi
 
-Python (FastAPI) + MySQL + React.js ile geliştirilmiş web tabanlı afet lojistik yönetim sistemi.
+Deprem, yangın gibi afet senaryolarında yardım malzemelerinin toplanması, depolanması ve dağıtılmasını yöneten tam kapsamlı web uygulaması.
+
+---
+
+## 📋 Gereksinimler
+
+- [Python 3.11](https://www.python.org/downloads/)
+- [Node.js 18+](https://nodejs.org/)
+- [XAMPP](https://www.apachefriends.org/) (MySQL için)
+- Git
+
+---
+
+## 🚀 Kurulum
+
+### 1. Repoyu İndir
+
+```bash
+git clone https://github.com/berbang04/afet-lojistik.git
+cd afet-lojistik
+```
+
+### 2. Veritabanını Kur
+
+1. XAMPP'ı başlat → **Apache** ve **MySQL**'i çalıştır
+2. Tarayıcıda `http://localhost/phpmyadmin` aç
+3. Yeni veritabanı oluştur: `afet_lojistik`
+4. Oluşturulan veritabanını seç → **Import** → `database/afet_lojistik.sql` dosyasını seç → **Go**
+
+### 3. Backend Kurulumu
+
+```bash
+cd backend
+pip install -r requirements.txt
+```
+
+`backend/.env` dosyası oluştur ve şunu yaz:
+
+```env
+DATABASE_URL=mysql+pymysql://root:@localhost/afet_lojistik
+SECRET_KEY=gizli_anahtar_buraya
+```
+
+> ⚠️ XAMPP MySQL şifren varsa `root:SIFREN@localhost` şeklinde yaz.
+
+Backend'i başlat:
+
+```bash
+py -3.11 -m uvicorn main:app --reload
+```
+
+Backend `http://localhost:8000` adresinde çalışacak.
+
+### 4. Frontend Kurulumu
+
+```bash
+cd frontend
+npm install
+npm start
+```
+
+Frontend `http://localhost:3000` adresinde açılacak.
+
+---
+
+## 🔑 Giriş Bilgileri
+
+| Rol | E-posta | Şifre |
+|-----|---------|-------|
+| Admin | admin@afet.gov.tr | Admin1234! |
+| Toplama | toplama@afet.gov.tr | Admin1234! |
+| Dağıtım | dagitim@afet.gov.tr | Admin1234! |
+| Bölge Müdürü (Ege) | bolge.ege@afet.gov.tr | Admin1234! |
+| Bölge Müdürü (Marmara) | bolge.marmara@afet.gov.tr | Admin1234! |
+| Operasyon Müdürü | yavuz@afet.gov.tr | Admin1234! |
+
+---
+
+## 🛠️ Teknoloji Stack
+
+- **Frontend:** React.js, Leaflet.js, Axios
+- **Backend:** Python FastAPI, SQLAlchemy, JWT
+- **Veritabanı:** MySQL (MariaDB)
 
 ---
 
@@ -9,232 +91,54 @@ Python (FastAPI) + MySQL + React.js ile geliştirilmiş web tabanlı afet lojist
 ```
 afet-lojistik/
 ├── backend/
-│   ├── main.py              # FastAPI ana uygulama
-│   ├── database.py          # MySQL bağlantısı
-│   ├── models.py            # Veritabanı modelleri (SQLAlchemy)
-│   ├── schemas.py           # Pydantic şemaları
-│   ├── auth_utils.py        # JWT & şifre işlemleri
-│   ├── setup.py             # Kurulum ve ilk admin oluşturma
-│   ├── triggers.sql         # MySQL trigger'ları (stok otomasyonu)
-│   ├── requirements.txt     # Python bağımlılıkları
+│   ├── main.py
+│   ├── models.py
+│   ├── schemas.py
+│   ├── database.py
+│   ├── auth_utils.py
+│   ├── requirements.txt
 │   └── routers/
-│       ├── auth.py          # Giriş / kimlik doğrulama
-│       ├── admin.py         # Yetkili (1. tip) işlemleri
-│       ├── toplama.py       # Toplama merkezi (2. tip) işlemleri
-│       ├── dagitim.py       # Dağıtım merkezi (3. tip) işlemleri
-│       └── notifications.py # Bildirim sistemi
-└── frontend/
-    ├── package.json
-    └── src/
-        ├── App.js           # Routing
-        ├── index.css        # Global stiller
-        ├── api/index.js     # API servis katmanı
-        ├── context/
-        │   └── AuthContext.js
-        ├── components/
-        │   └── Layout.js    # Sidebar + Topbar layout
-        └── pages/
-            ├── LoginPage.js
-            ├── AdminDashboard.js
-            ├── AdminKullanicilar.js
-            ├── AdminMerkezler.js
-            ├── ToplamaDashboard.js
-            ├── ToplamaStoklar.js
-            ├── ToplamaTirlar.js
-            ├── HareketGecmisi.js
-            ├── DagitimDashboard.js
-            ├── DagitimStoklar.js
-            ├── DagitimTirlar.js
-            └── DagitimIstek.js
+│       ├── auth.py
+│       ├── admin.py
+│       ├── toplama.py
+│       ├── dagitim.py
+│       ├── bolge.py
+│       ├── bolge_yonetim.py
+│       └── arac_sofor.py
+├── frontend/
+│   ├── public/
+│   └── src/
+│       ├── pages/
+│       ├── components/
+│       ├── context/
+│       └── api/
+└── database/
+    └── afet_lojistik.sql
 ```
 
 ---
 
-## ⚙️ Gereksinimler
+## ⚠️ Sık Karşılaşılan Sorunlar
 
-- **Python** 3.10+
-- **Node.js** 18+
-- **MySQL** 8.0+
-
----
-
-## 🚀 KURULUM ADIMLARI
-
-### 1. MySQL Veritabanı Oluşturun
-
-MySQL konsoluna bağlanın:
+**Backend başlamıyor:**
 ```bash
-mysql -u root -p
+pip install pymysql cryptography
 ```
 
-Veritabanını oluşturun:
-```sql
-CREATE DATABASE afet_lojistik CHARACTER SET utf8mb4 COLLATE utf8mb4_turkish_ci;
-EXIT;
-```
-
----
-
-### 2. Backend Kurulumu
-
-```bash
-# Backend klasörüne girin
-cd afet-lojistik/backend
-
-# Sanal ortam oluşturun (önerilen)
-python -m venv venv
-
-# Sanal ortamı aktif edin
-# Windows:
-venv\Scripts\activate
-# Mac/Linux:
-source venv/bin/activate
-
-# Bağımlılıkları yükleyin
-pip install -r requirements.txt
-```
-
-#### Veritabanı bağlantısını ayarlayın
-
-`database.py` dosyasını açın ve şu satırı kendi bilgilerinizle güncelleyin:
-```python
-DATABASE_URL = "mysql+pymysql://KULLANICI:ŞİFRE@localhost:3306/afet_lojistik"
-# Örnek: "mysql+pymysql://root:12345@localhost:3306/afet_lojistik"
-```
-
-#### Kurulum betiğini çalıştırın (tabloları ve admin kullanıcısını oluşturur):
-```bash
-python setup.py
-```
-
-Başarılı çıktı:
-```
-✓ Bağımlılıklar yüklendi
-✓ Tablolar oluşturuldu
-✓ Admin kullanıcısı oluşturuldu
-  E-posta : admin@afet.gov.tr
-  Şifre   : Admin1234!
-```
-
-#### MySQL Trigger'larını uygulayın (stok otomasyonu):
-```bash
-mysql -u root -p afet_lojistik < triggers.sql
-```
-
-#### Backend sunucusunu başlatın:
-```bash
-uvicorn main:app --reload --port 8000
-```
-
-✅ API çalışıyor: http://localhost:8000
-📚 Swagger Docs: http://localhost:8000/docs
-
----
-
-### 3. Frontend Kurulumu
-
-```bash
-# Frontend klasörüne girin (yeni terminal)
-cd afet-lojistik/frontend
-
-# Bağımlılıkları yükleyin
-npm install
-
-# Geliştirme sunucusunu başlatın
-npm start
-```
-
-✅ Uygulama çalışıyor: http://localhost:3000
-
----
-
-## 🔐 Kullanıcı Tipleri ve Yetkileri
-
-### 1. Tip — Yetkili (Admin)
-- **Giriş:** admin@afet.gov.tr / Admin1234!
-- Kullanıcı oluşturma, düzenleme, silme
-- Merkez oluşturma (toplama / dağıtım)
-- Merkezlere yetkili kullanıcı atama
-- Tüm istatistikleri görüntüleme
-
-### 2. Tip — Toplama Merkezi Yetkilisi
-- **Giriş:** Admin tarafından oluşturulur
-- Kendi merkezine stok girişi yapma
-- Stok güncelleme ve silme
-- Tır kaydı oluşturma
-- Tır ulaşma durumu işaretleme
-- Hareket geçmişini görüntüleme
-- Dağıtım merkezlerinden gelen bildirimleri alma
-
-### 3. Tip — Dağıtım Merkezi Yetkilisi
-- **Giriş:** Admin tarafından oluşturulur
-- Gelen tırları takip etme ve "ulaştı" işaretleme
-- Kendi merkezine stok girişi (tırdan gelen)
-- Stoktan dağıtım çıkışı yapma
-- Tüm toplama merkezi yetkililerine istek/bildirim gönderme
-- Hareket geçmişini görüntüleme
-
----
-
-## 🔄 MySQL Trigger'ları
-
-`triggers.sql` dosyasındaki trigger'lar:
-
-| Trigger | Ne Zaman | Ne Yapar |
-|---------|----------|----------|
-| `stok_hareketi_sonrasi` | Stok hareketi eklenince | Stok adedini otomatik günceller |
-| `tir_ulasinca_bildirim` | Tır durumu "yolda"→"ulastu" olunca | Dağıtım yetkilisine bildirim gönderir |
-| `stok_kritik_seviye` | Stok 10 adede düşünce | Dağıtım yetkilisine uyarı gönderir |
-
----
-
-## 🛠️ Yaygın Sorunlar
-
-**MySQL bağlantı hatası:**
-```
-Çözüm: database.py içindeki DATABASE_URL'yi kontrol edin
-MySQL servisinin çalıştığından emin olun: sudo systemctl start mysql
-```
-
-**Port zaten kullanımda:**
-```bash
-# Backend için farklı port:
-uvicorn main:app --reload --port 8001
-# Frontend'de src/api/index.js içinde baseURL'yi güncelleyin
+**Harita görünmüyor:**
+`public/index.html` dosyasına şunları ekle:
+```html
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
 ```
 
 **CORS hatası:**
-```
-Çözüm: main.py içindeki allow_origins listesine
-frontend adresinizi ekleyin
-```
-
-**npm install hatası:**
-```bash
-# Node.js versiyonunu kontrol edin (18+ gerekli)
-node --version
-# Gerekirse: npm cache clean --force
-```
+Backend'in `http://localhost:8000` adresinde çalıştığından emin ol.
 
 ---
 
-## 📦 Üretim Ortamı (Production)
+## 👨‍💻 Geliştirici
 
-**Frontend build:**
-```bash
-cd frontend
-npm run build
-# build/ klasörü oluşur, nginx veya apache ile servis edilebilir
-```
-
-**Backend production:**
-```bash
-# Gunicorn ile:
-pip install gunicorn
-gunicorn main:app -w 4 -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:8000
-```
-
-**Güvenlik notları:**
-- `auth_utils.py` içindeki `SECRET_KEY`'i değiştirin
-- `database.py` içindeki şifreyi `.env` dosyasına taşıyın
-- İlk admin şifresini giriş yaptıktan sonra güncelleyin
+Bitirme projesi — 2025
